@@ -1,0 +1,16 @@
+{
+  "name": "yllumi/heroic-webman",
+  "type": "library",
+  "license": "MIT",
+  "description": "Webman plugin yllumi/heroic-webman",
+  "require": {
+  },
+  "autoload": {
+    "psr-4": {
+      "Yllumi\\HeroicWebman\\": "src"
+    },
+    "files": [
+      "src/helpers.php"
+    ]
+  }
+}
