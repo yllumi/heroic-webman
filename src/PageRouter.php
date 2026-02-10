@@ -122,7 +122,21 @@ class PageRouter
 
         // Urutkan router berdasarkan path yang lebih spesifik
         uksort($router, function ($a, $b) {
-            return strlen($b) - strlen($a);
+            $hasParamA = strpos($a, ':') !== false;
+            $hasParamB = strpos($b, ':') !== false;
+            
+            // Dahulukan path dengan parameter
+            if ($hasParamA && !$hasParamB) {
+                return -1;
+            }
+            if (!$hasParamA && $hasParamB) {
+                return 1;
+            }
+            
+            // Jika sama-sama punya/tidak punya parameter, urutkan berdasarkan jumlah segment
+            $segmentsA = count(explode('/', trim($a, '/')));
+            $segmentsB = count(explode('/', trim($b, '/')));
+            return $segmentsB - $segmentsA;
         });
 
         return $router;
