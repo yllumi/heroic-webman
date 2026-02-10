@@ -2,7 +2,7 @@
   "name": "yllumi/heroic-webman",
   "type": "library",
   "license": "MIT",
-  "description": "Webman plugin yllumi/heroic-webman",
+  "description": "Webman plugin for page based routing",
   "require": {
   },
   "autoload": {
