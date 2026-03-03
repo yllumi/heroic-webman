@@ -10,13 +10,8 @@ class PageRouter
     public static function init()
     {
         \Webman\Route::fallback(function (\support\Request $request) {
-            // Gunakan static agar cache instansi bertahan di memori worker
-            static $instances = [];
-
-            // Pre-load NotFound Controller jika belum ada
-            if (!isset($instances['notfound'])) {
-                $instances['notfound'] = new \app\pages\notfound\PageController;
-            }
+            // Gunakan static agar cache callback bertahan di memori worker
+            static $callbackCache = [];
 
             // Gunakan path() bukan uri() untuk menghindari query string masuk ke pengecekan file
             $path = trim($request->path(), '/');
@@ -24,6 +19,16 @@ class PageRouter
 
             if ($path === '') {
                 $path = config('app.default_page', 'home');
+            }
+
+            // Cache key per method + path, sama seperti mekanisme cache internal Webman
+            $cacheKey = strtoupper($httpVerb) . '/' . $path;
+
+            if (isset($callbackCache[$cacheKey])) {
+                [$callback, $request->controller, $request->action] = $callbackCache[$cacheKey];
+                $request->plugin = '';
+                $request->app    = '';
+                return $callback($request);
             }
 
             $pagesPath      = config('app.pages_path', app_path('pages'));
@@ -49,27 +54,51 @@ class PageRouter
                         array_shift($params);
                     } elseif (!method_exists($controllerNamespace, $methodName)) {
                         // Method Index tidak ada, lempar ke NotFound
-                        return $instances['notfound']->getIndex($request);
+                        return static::notFoundResponse($request, $callbackCache);
                     }
 
-                    // Cache instansi Controller agar tidak 'new' terus setiap request
-                    if (!isset($instances[$controllerNamespace])) {
-                        if (!class_exists($controllerNamespace)) {
-                            return $instances['notfound']->getIndex($request);
-                        }
-                        $instances[$controllerNamespace] = new $controllerNamespace;
+                    if (!class_exists($controllerNamespace)) {
+                        return static::notFoundResponse($request, $callbackCache);
                     }
 
-                    // Panggil method dengan menyuntikkan Request sebagai parameter pertama, diikuti params URL
-                    // Ini standar Webman agar controller tetap bisa akses $request
-                    return $instances[$controllerNamespace]->{$methodName}($request, ...$params);
+                    // Set request context agar middleware bisa membaca controller & action
+                    $request->plugin     = '';
+                    $request->app        = '';
+                    $request->controller = $controllerNamespace;
+                    $request->action     = $methodName;
+
+                    // Bungkus controller call dengan middleware menggunakan App::getCallback()
+                    // Params URL di-bake ke dalam callback dan di-cache per path unik
+                    $callback = \Webman\App::getCallback('', '', [$controllerNamespace, $methodName], $params, true, null);
+                    $callbackCache[$cacheKey] = [$callback, $controllerNamespace, $methodName];
+
+                    return $callback($request);
                 }
 
                 $params[] = array_pop($uriSegments);
             }
 
-            return $instances['notfound']->getIndex($request);
+            return static::notFoundResponse($request, $callbackCache);
         });
+    }
+
+    /**
+     * Return NotFound response, with middleware applied.
+     */
+    protected static function notFoundResponse(\support\Request $request, array &$callbackCache): \Webman\Http\Response
+    {
+        $notFoundCacheKey = 'GET/__notfound__';
+        if (!isset($callbackCache[$notFoundCacheKey])) {
+            $callbackCache[$notFoundCacheKey] = [
+                \Webman\App::getCallback('', '', [\app\pages\notfound\PageController::class, 'getIndex'], [], true, null),
+                \app\pages\notfound\PageController::class,
+                'getIndex',
+            ];
+        }
+        [$callback, $request->controller, $request->action] = $callbackCache[$notFoundCacheKey];
+        $request->plugin = '';
+        $request->app    = '';
+        return $callback($request);
     }
 
     public static function scanFrontendRouters($pagesPath = null)
