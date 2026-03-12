@@ -61,6 +61,27 @@ class PageRouter
                         return static::notFoundResponse($request, $callbackCache);
                     }
 
+                    // Konversi positional params ke named params agar sesuai dengan
+                    // sistem DI Webman yang melakukan lookup berdasarkan nama parameter
+                    try {
+                        $refParams = (new \ReflectionMethod($controllerNamespace, $methodName))->getParameters();
+                        if (!empty($refParams)) {
+                            $fp = $refParams[0];
+                            $isRequest = ($fp->hasType() && stripos($fp->getType()->getName(), 'Request') !== false)
+                                || strtolower($fp->getName()) === 'request';
+                            if ($isRequest) {
+                                array_shift($refParams);
+                            }
+                        }
+                        $namedParams = [];
+                        foreach ($params as $i => $value) {
+                            if (isset($refParams[$i])) {
+                                $namedParams[$refParams[$i]->getName()] = $value;
+                            }
+                        }
+                        $params = $namedParams;
+                    } catch (\ReflectionException $e) {}
+
                     // Set request context agar middleware bisa membaca controller & action
                     $request->plugin     = '';
                     $request->app        = '';
