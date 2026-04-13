@@ -93,20 +93,16 @@ if (! function_exists('old')) {
 
 function admin_url($path = '')
 {
-    return '/app/panel/' . ltrim($path, '/');
+    return '/panel/' . ltrim($path, '/');
 }
 
 function cell($view, $data = [], $plugin = null)
 {
-    // Auto-detect plugin from caller's namespace if not explicitly provided
     if ($plugin === null) {
-        $plugin = _detect_plugin_from_backtrace();
-    }
-
-    if ($plugin) {
-        $basePath = base_path() . '/plugin/' . $plugin . '/app/view/';
+        // Auto-detect base view path from caller's namespace (local or vendor)
+        $basePath = _detect_plugin_from_backtrace() ?? base_path() . '/app/view/';
     } else {
-        $basePath = base_path() . '/app/view/';
+        $basePath = _plugin_to_view_path($plugin);
     }
 
     ob_start();
@@ -115,20 +111,22 @@ function cell($view, $data = [], $plugin = null)
     return ob_get_clean();
 }
 
-function render($view, $data = [], $layout = 'admin', $plugin = null)
+function render($view, $data = [], $plugin = null, $layout = 'admin')
 {
-    // Auto-detect once and pass explicitly so nested calls don't re-detect
+    $content = cell($view, $data, $plugin);
+    
     if ($plugin === null) {
-        $plugin = _detect_plugin_from_backtrace();
+        // Auto-detect once and pass explicitly so nested calls don't re-detect
+        $basePath = _detect_plugin_from_backtrace();
+    } else {
+        $basePath = _plugin_to_view_path($plugin);
     }
 
-    $content = cell($view, $data, $plugin);
-
-    // Prefer plugin-local layout, fallback to panel layout
-    if ($plugin) {
-        $layoutFile = base_path() . '/plugin/' . $plugin . '/app/view/_layouts/' . $layout . '.php';
+    if ($basePath) {
+        // Prefer plugin-local layout, fallback to panel layout
+        $layoutFile = $basePath . '_layouts/' . $layout . '.php';
         if (! file_exists($layoutFile)) {
-            $layoutFile = base_path() . '/plugin/panel/app/view/_layouts/' . $layout . '.php';
+            $layoutFile = base_path() . '/vendor/yllumi/wmpanel/src/app/view/_layouts/' . $layout . '.php';
         }
     } else {
         $layoutFile = base_path() . '/app/view/_layouts/' . $layout . '.php';
@@ -195,20 +193,86 @@ function rolePrivileges($roleId)
 }
 
 /**
- * Walk up the call stack to find the first frame whose class lives under
- * the `plugin\{name}\` namespace, then return {name}.
- * Returns null if the call did not originate from a plugin.
+ * Walk up the call stack to find the first frame whose class originates from
+ * a plugin — either a local plugin (plugin\name\) or a vendor package.
+ * Returns the absolute base view path (e.g. /path/to/.../app/view/), or null.
  */
 function _detect_plugin_from_backtrace(): ?string
 {
     $frames = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 12);
 
+    // First pass: local plugins via plugin\{name}\ namespace convention
     foreach ($frames as $frame) {
         $class = $frame['class'] ?? '';
         if (preg_match('/^plugin\\\\([^\\\\]+)\\\\/', $class, $m)) {
-            return $m[1]; // e.g. "panel", "mahasiswa", "keuangan"
+            return base_path() . '/plugin/' . $m[1] . '/app/view/';
+        }
+    }
+
+    // Second pass: vendor packages — resolve via Composer PSR-4 classmap
+    $loader    = require base_path() . '/vendor/autoload.php';
+    $prefixMap = $loader->getPrefixesPsr4();
+
+    foreach ($frames as $frame) {
+        $class = $frame['class'] ?? '';
+        if (! $class || ! str_contains($class, '\\')) {
+            continue;
+        }
+
+        $bestLen      = 0;
+        $bestViewPath = null;
+
+        foreach ($prefixMap as $prefix => $paths) {
+            if (
+                str_starts_with($class . '\\', $prefix)
+                && strlen($prefix) > $bestLen
+            ) {
+                $candidate = rtrim($paths[0], '/') . '/app/view/';
+                if (is_dir($candidate)) {
+                    $bestLen      = strlen($prefix);
+                    $bestViewPath = $candidate;
+                }
+            }
+        }
+
+        if ($bestViewPath !== null) {
+            return $bestViewPath;
         }
     }
 
     return null;
+}
+
+/**
+ * Resolve an explicit plugin name to its absolute base view path.
+ * Checks local plugin/ directory first, then vendor packages via Composer PSR-4.
+ *
+ * $plugin can be:
+ *   - a local plugin name: "panel", "mahasiswa"
+ *   - a vendor/package name: "yllumi/test"
+ */
+function _plugin_to_view_path(string $plugin): string
+{
+    // 1. Local plugin directory (single-word names like "panel", "mahasiswa")
+    $localPath = base_path() . '/plugin/' . $plugin . '/app/view/';
+    if (is_dir($localPath)) {
+        return $localPath;
+    }
+
+    // 2. Convert vendor/package → expected PSR-4 prefix, e.g. "yllumi/test" → "Yllumi\Test\"
+    $expectedPrefix = implode('\\', array_map('ucfirst', explode('/', $plugin))) . '\\';
+
+    $loader = require base_path() . '/vendor/autoload.php';
+    foreach ($loader->getPrefixesPsr4() as $prefix => $paths) {
+        // Match exact prefix or a prefix that starts with our expected namespace
+        if (stripos($prefix, $expectedPrefix) === 0 || stripos($expectedPrefix, $prefix) === 0) {
+            $candidate = rtrim($paths[0], '/') . '/app/view/';
+            if (is_dir($candidate)) {
+                return $candidate;
+            }
+        }
+    }
+
+    // Fallback: return local path even if directory not yet created
+    return $localPath;
 }
