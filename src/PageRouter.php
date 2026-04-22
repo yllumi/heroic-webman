@@ -2,6 +2,8 @@
 
 namespace Yllumi\HeroicWebman;
 
+use Yllumi\HeroicWebman\Attributes\FrontendRoute;
+
 class PageRouter
 {
     /**
