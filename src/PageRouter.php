@@ -38,9 +38,10 @@ class PageRouter
 
             $uriSegments = explode('/', $path);
 
-            // Loop untuk mencari folder terdalam yang memiliki PageController.php
-            while ($uriSegments !== []) {
-                $subPath = implode('/', $uriSegments);
+            // Normalize segments: replace dashes with underscores for folder lookup
+            $normalizedSegments = array_map(fn($s) => str_replace('-', '_', $s), $uriSegments);
+            while ($normalizedSegments !== []) {
+                $subPath = implode('/', $normalizedSegments);
                 $folderPath = $pagesPath . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $subPath);
 
                 if (is_dir($folderPath) && file_exists($folderPath . DIRECTORY_SEPARATOR . $controllerName . '.php')) {
@@ -97,6 +98,7 @@ class PageRouter
                 }
 
                 $params[] = array_pop($uriSegments);
+                array_pop($normalizedSegments);
             }
 
             return static::notFoundResponse($request, $callbackCache);
