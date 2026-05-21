@@ -16,12 +16,16 @@ class FERouter
         return (new self())->router;
     }
 
-    public static function getRouter(string $ssrRoute = '', string $ssrContent = ''): string
+    public static function getRouter(string $ssrRoute = '', string $ssrContent = '', ?array $ssrData = null): string
     {
         $html = ltrim(PageRouter::renderRouter((new self())->router));
 
         if ($ssrRoute !== '' && $ssrContent !== '') {
             $html = (new self())->injectSsrContent($html, $ssrRoute, $ssrContent);
+        }
+
+        if ($ssrData !== null) {
+            $html .= "\n<script>" . self::ssrDataScript($ssrData) . "</script>";
         }
 
         return $html;
