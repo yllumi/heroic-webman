@@ -1,4 +1,4 @@
-<div class="container" id="page-welcome">
+<div class="container" id="page-welcome" x-data="$heroic.page()">
 
     <!-- Hero -->
     <div class="hc-hero">
@@ -6,7 +6,7 @@
         <div class="hc-hero-inner">
             <img src="https://yllumi.github.io/heroic/assets/logo-text.png" class="hc-logo-img" alt="Heroic">
             <p class="hc-tagline">PHP · Alpine.js · Pinecone Router</p>
-            <span class="hc-badge">v<?= $version ?? '1.0.0' ?> &nbsp;·&nbsp; PHP <?= $php_version ?? PHP_VERSION ?></span>
+            <span class="hc-badge">v<span x-text="data.version || '1.0.0'"></span> &nbsp;·&nbsp; PHP <span x-text="data.php_version"></span></span>
         </div>
     </div>
 
@@ -14,17 +14,17 @@
     <div class="hc-section">
         <p class="hc-section-label">Built on</p>
         <div class="hc-stack-list">
-            <?php foreach ($stack ?? [] as $item): ?>
+            <template x-for="item in data.stack || []" :key="item.name">
                 <div class="hc-stack-card">
-                    <div class="hc-stack-icon" style="background:<?= htmlspecialchars($item['color']) ?>22;color:<?= htmlspecialchars($item['color']) ?>">
-                        <i class="bi <?= htmlspecialchars($item['icon']) ?>"></i>
+                    <div class="hc-stack-icon" :style="'background:' + item.color + '22;color:' + item.color">
+                        <i class="bi" :class="item.icon"></i>
                     </div>
                     <div>
-                        <div class="hc-stack-name"><?= htmlspecialchars($item['name']) ?></div>
-                        <div class="hc-stack-desc"><?= htmlspecialchars($item['desc']) ?></div>
+                        <div class="hc-stack-name" x-text="item.name"></div>
+                        <div class="hc-stack-desc" x-text="item.desc"></div>
                     </div>
                 </div>
-            <?php endforeach ?>
+            </template>
         </div>
     </div>
 
@@ -32,13 +32,13 @@
     <div class="hc-section">
         <p class="hc-section-label">What's included</p>
         <div class="hc-feature-grid">
-            <?php foreach ($features ?? [] as $f): ?>
+            <template x-for="f in data.features || []" :key="f.title">
                 <div class="hc-feature-card">
-                    <i class="bi <?= htmlspecialchars($f['icon']) ?> hc-feature-icon"></i>
-                    <div class="hc-feature-title"><?= htmlspecialchars($f['title']) ?></div>
-                    <div class="hc-feature-desc"><?= htmlspecialchars($f['desc']) ?></div>
+                    <i class="bi hc-feature-icon" :class="f.icon"></i>
+                    <div class="hc-feature-title" x-text="f.title"></div>
+                    <div class="hc-feature-desc" x-text="f.desc"></div>
                 </div>
-            <?php endforeach ?>
+            </template>
         </div>
     </div>
 
@@ -60,6 +60,8 @@
     <div class="hc-footer">
         Edit <code>app/pages/home/template.php</code> to get started.
     </div>
+
+    <a href="/home/subpage">Goto Subpage</a>
 
 </div>
 
