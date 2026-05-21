@@ -1,0 +1,146 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * Heroic Webman — install scaffolding files into a Webman project.
+ *
+ * Usage:
+ *   php vendor/yllumi/heroic-webman/bin/install [--force]
+ *
+ * --force   Overwrite files that already exist in the destination.
+ */
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function color(string $text, string $code): string
+{
+    return "\e[{$code}m{$text}\e[0m";
+}
+
+function ok(string $msg): void   { echo color('  ✔ ', '32') . $msg . PHP_EOL; }
+function skip(string $msg): void { echo color('  ○ ', '33') . $msg . PHP_EOL; }
+function fail(string $msg): void { echo color('  ✘ ', '31') . $msg . PHP_EOL; }
+function info(string $msg): void { echo color($msg, '36') . PHP_EOL; }
+
+function copyRecursive(string $src, string $dst, bool $force): void
+{
+    $items = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($src, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+
+    foreach ($items as $item) {
+        $rel  = substr($item->getPathname(), strlen($src) + 1);
+        $dest = $dst . DIRECTORY_SEPARATOR . $rel;
+
+        if ($item->isDir()) {
+            if (!is_dir($dest)) {
+                mkdir($dest, 0755, true);
+            }
+            continue;
+        }
+
+        if (file_exists($dest) && !$force) {
+            skip($rel);
+            continue;
+        }
+
+        if (!is_dir(dirname($dest))) {
+            mkdir(dirname($dest), 0755, true);
+        }
+
+        if (copy($item->getPathname(), $dest)) {
+            ok($rel);
+        } else {
+            fail($rel . ' (copy failed)');
+        }
+    }
+}
+
+function copyFlat(string $src, string $dst, bool $force): void
+{
+    foreach (glob($src . '/*') as $file) {
+        if (!is_file($file)) continue;
+
+        $rel  = basename($file);
+        $dest = $dst . DIRECTORY_SEPARATOR . $rel;
+
+        if (file_exists($dest) && !$force) {
+            skip($rel);
+            continue;
+        }
+
+        if (!is_dir($dst)) {
+            mkdir($dst, 0755, true);
+        }
+
+        if (copy($file, $dest)) {
+            ok($rel);
+        } else {
+            fail($rel . ' (copy failed)');
+        }
+    }
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+
+$force      = in_array('--force', $argv ?? [], true);
+$packageDir = dirname(__DIR__);
+
+// Detect project root: walk up until we find composer.json that is NOT this package
+$projectRoot = null;
+$dir = $packageDir;
+for ($i = 0; $i < 5; $i++) {
+    $dir = dirname($dir);
+    if (is_file($dir . '/composer.json') && is_dir($dir . '/app')) {
+        $projectRoot = $dir;
+        break;
+    }
+}
+
+if ($projectRoot === null) {
+    // Fallback: assume script is run from the project root
+    $projectRoot = getcwd();
+}
+
+echo PHP_EOL;
+info('Heroic Webman — install');
+echo color('  Project root : ', '90') . $projectRoot . PHP_EOL;
+echo color('  Force mode   : ', '90') . ($force ? color('on', '33') : 'off') . PHP_EOL;
+echo PHP_EOL;
+
+// ── Copy template/basic → app/pages/ ─────────────────────────────────────────
+
+$templateSrc = $packageDir . '/template/basic';
+$templateDst = $projectRoot . '/app/pages';
+
+if (!is_dir($templateSrc)) {
+    fail("template/basic not found in package — skipping pages.");
+} else {
+    info('Pages  →  app/pages/');
+    if (!is_dir($templateDst)) {
+        mkdir($templateDst, 0755, true);
+    }
+    copyRecursive($templateSrc, $templateDst, $force);
+    echo PHP_EOL;
+}
+
+// ── Copy js → public/js/ ──────────────────────────────────────────────────────
+
+$jsSrc = $packageDir . '/js';
+$jsDst = $projectRoot . '/public/js';
+
+if (!is_dir($jsSrc)) {
+    fail("js/ not found in package — skipping JS files.");
+} else {
+    info('JS     →  public/js/');
+    if (!is_dir($jsDst)) {
+        mkdir($jsDst, 0755, true);
+    }
+    copyFlat($jsSrc, $jsDst, $force);
+    echo PHP_EOL;
+}
+
+// ── Done ──────────────────────────────────────────────────────────────────────
+
+echo color('  Done. Skipped files already exist — use --force to overwrite.', '90') . PHP_EOL . PHP_EOL;

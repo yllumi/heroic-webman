@@ -5,6 +5,9 @@
   "description": "Webman plugin for page based routing",
   "require": {
   },
+  "bin": [
+    "bin/install"
+  ],
   "autoload": {
     "psr-4": {
       "Yllumi\\HeroicWebman\\": "src"
