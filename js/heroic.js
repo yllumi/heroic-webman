@@ -224,18 +224,26 @@
 
       // Function to initialize the page
       init() {
-        // Auto-detect data URL from current route if not provided
+        // Auto-detect data URL from current route if not provided.
+        // Use Pinecone Router's context.path when available — it always reflects
+        // the route being rendered, independent of when pushState updates window.location.
         if (!this.config.url) {
-          const pathname = window.location.pathname;
+          const pathname = this.$router?.context?.path ?? window.location.pathname;
           const pagePath = pathname === '/' ? 'home' : pathname.replace(/^\/|\/$/g, '');
           this.config.url = pagePath + '/data';
         }
 
-        // Use SSR data injected by server on first load (hydration)
+        // Use SSR data injected by server on first load (hydration).
+        // Validate the URL to prevent stale SSR data from a different page
+        // contaminating this page (e.g. custom page functions that don't consume it).
         if (window.__HEROIC_SSR_DATA__) {
-          this.data = window.__HEROIC_SSR_DATA__;
-          $heroic.setCache(this.config.url, this.data);
+          if (window.__HEROIC_SSR_URL__ === this.config.url) {
+            this.data = window.__HEROIC_SSR_DATA__;
+            $heroic.setCache(this.config.url, this.data);
+          }
+          // Always clear — prevents bleed-through across navigations
           window.__HEROIC_SSR_DATA__ = null;
+          window.__HEROIC_SSR_URL__ = null;
         }
 
         // Set the page title
@@ -247,9 +255,9 @@
         }
 
         // Skip network fetch when data was already hydrated from SSR
-        if (!this.data || Object.keys(this.data).length === 0) {
+        // if (!this.data || Object.keys(this.data).length === 0) {
           this.loadPage();
-        }
+        // }
       },
 
       loadPage(fetchUrl = null) {

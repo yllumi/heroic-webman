@@ -26,28 +26,7 @@ document.addEventListener("alpine:init", () => {
     facets: {},
     favorites: [],
     bookMap: null,
-
-    async getSiteSettings() {
-      if (Object.keys(Alpine.store("core").settings).length < 1) {
-        try {
-          await $heroic
-            .fetch("/_components/common/settings")
-            .then((response) => {
-              Alpine.store("core").settings = Object.freeze(
-                response.data.settings,
-              );
-              Alpine.store("core").user = response.data.user;
-            })
-            .catch((error) => {
-              console.log(error);
-            });
-        } catch (error) {
-          // Tangani error jika terjadi masalah pada saat fetching data
-          console.error("Error fetching site settings:", error);
-        }
-      }
-    },
-
+    
   });
 
   NProgress.configure({

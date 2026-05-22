@@ -25,7 +25,8 @@ class FERouter
         }
 
         if ($ssrData !== null) {
-            $html .= "\n<script>" . self::ssrDataScript($ssrData) . "</script>";
+            $ssrUrl = ($ssrRoute === '/' || $ssrRoute === '') ? 'home/data' : ltrim($ssrRoute, '/') . '/data';
+            $html .= "\n<script>" . self::ssrDataScript($ssrData, $ssrUrl) . "</script>";
         }
 
         return $html;
@@ -37,10 +38,11 @@ class FERouter
      *
      * Usage: <?= \Yllumi\HeroicWebman\FERouter::ssrDataScript($ssr_data ?? null) ?>
      */
-    public static function ssrDataScript(?array $data): string
+    public static function ssrDataScript(?array $data, string $url = ''): string
     {
         $json = $data !== null ? json_encode($data, JSON_HEX_TAG | JSON_UNESCAPED_UNICODE) : 'null';
-        return "window.__HEROIC_SSR_DATA__ = {$json};";
+        $urlJson = json_encode($url);
+        return "window.__HEROIC_SSR_DATA__ = {$json}; window.__HEROIC_SSR_URL__ = {$urlJson};";
     }
 
     /**
